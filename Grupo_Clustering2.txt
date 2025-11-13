@@ -1,0 +1,80 @@
+Grupo Clustering 
+Integrantes: 
+- Alcon Elizabeth
+- Alcon Lucy
+- Cruz Dennys
+NLP — Clasificación automática de tickets 
+
+
+1) Propósito general
+El script implementa un flujo de clasificación de tickets (texto corto/mediano) para asignar categorías o temas. 
+La meta: transformar texto en vectores numéricos, entrenar varios modelos supervisados, evaluar su desempeño y seleccionar el mejor.
+
+2) Carga y validación de datos
+• Se lee un dataset (Se lee el archivo JSON). 
+• Se verifican nulos y se eliminan filas vacías en texto o etiqueta. 
+• Se verifican las columnas de dataset.
+. Se renombran las columnas de dataset.
+
+3) Limpieza y normalización del texto
+• Conversión a minúsculas, eliminación de espacios extra y signos irrelevantes. 
+• Se normalizan los datos. 
+• Eliminación de tokens vacíos, stopwords, lematización.
+
+4) Vectorización
+• Se utiliza CountVectorizer para obtener conteos de términos (bolsa de palabras). 
+• TfidfTransformer (o TfidfVectorizer directo) para ponderar términos por TF–IDF; reduce el peso de palabras muy frecuentes y poco informativas. 
+• Se limita el vocabulario con parámetros como min_df, max_df, ngram_range y se remueven términos demasiado raros o demasiado comunes.
+
+5) División de datos
+• Se usa train_test_split para mantener la proporción de clases. 
+• Se fija random_state para reproducibilidad. 
+• Se comprueba que haya al menos dos clases; si no, aborta con un mensaje claro.
+
+6) Modelos probados
+Se entrenan al menos tres clasificadores de referencia sobre los vectores TF–IDF (X_train_tfidf, y_train):
+• Regresión Logística (one-vs-rest): fuerte baseline para texto; maneja bien alta dimensionalidad.
+• Árbol de Decisión: interpretable, pero propenso al sobreajuste si no se poda.
+• Random Forest: ensamble de árboles; suele mejorar robustez y generalización.
+• (Opcional) Multinomial Naive Bayes: rápido, sorprendentemente competitivo con texto, especialmente con TF–IDF o conteos.
+
+7) Evaluación
+• Predicciones en X_test_tfidf y comparación con y_test. 
+• Métricas calculadas: accuracy, precisión, exhaustividad (recall), F1 macro/micro y matriz de confusión. 
+• En problemas desbalanceados, F1-macro y balanced_accuracy informan mejor que solo accuracy. 
+• Se reporta el mejor modelo según una métrica objetivo (por ejemplo, F1-macro). 
+
+8) Manejo de desbalance y validación
+• Si las clases están desbalanceadas, se pueden usar class_weight='balanced' (LogisticRegression) o ajuste de pesos por clase. 
+• Validación cruzada (StratifiedKFold) para estimar varianza de desempeño; útil cuando el test es pequeño. 
+• GridSearchCV o RandomizedSearchCV afinan hiperparámetros (C en LR; max_depth/n_estimators en árboles/forest).
+
+9) Pipeline recomendado (mejora estructural)
+Para evitar fugas de información y asegurar reproducibilidad, se integra todo en sklearn.pipeline.Pipeline:
+   Pipeline([
+     ('vect', CountVectorizer(...)),
+     ('tfidf', TfidfTransformer(...)),
+     ('clf', LogisticRegression(...))
+   ])
+Con esto, el ajuste y la predicción siguen exactamente el mismo preprocesamiento. Alternativamente, TfidfVectorizer reemplaza a ('vect','tfidf') en un solo paso.
+
+10) Salidas y trazabilidad
+• Se imprime un resumen por modelo: métricas clave y una tabla final comparativa. 
+• Se guarda el mejor modelo (pickle/joblib) y, si corresponde, el vocabulario. 
+• Se fija random_state y se documentan versiones de librerías para reproducibilidad.
+
+11) Errores detectados y cómo resolverlos (del registro mostrado)
+a) AttributeError: 'NoneType' object has no attribute 'values' en y_series.values
+   — Causa: y_series es None (columna de etiquetas no encontrada o mal creada).
+   — Acción: revisar df.columns y asignar y_series = df['nombre_correcto'].astype(str); validar len(np.unique(y)) >= 2.
+
+b) ModuleNotFoundError: No module named 'unidecode'
+   — Acción: instalar con pip install unidecode o eliminar la dependencia si no es crítica.
+
+c) Advertencias comunes
+   — Vocabularios vacíos (CountVectorizer): suele ocurrir si min_df es muy alto o tras limpieza agresiva; bajar min_df o revisar preprocesado.
+   — Convergencia (LogisticRegression): aumentar max_iter (por ejemplo, 200–1000) o escalar C.
+
+12) Decisión final
+El código compara varios modelos y elige el que maximiza la métrica objetivo (sugerido: F1-macro). También recomienda, por robustez, Logistic Regression o Random Forest como puntos de partida; Naive Bayes es un baseline veloz y competitivo. 
+La versión final debería empaquetar preprocesamiento + vectorización + clasificador en un único Pipeline y persistir el mejor estimador para uso en producción.
